@@ -1,0 +1,4 @@
+#Modman file for mapping checkoutapi 
+modules/gateways/checkoutapipayment.php modules/gateways/checkoutapipayment.php
+modules/gateways/callback/checkoutapipayment.php modules/gateways/callback/checkoutapipayment.php
+modules/gateways/includes modules/gateways/includes
