@@ -1,145 +1,106 @@
 <?php
-class model_methods_creditcard extends model_methods_Abstract
+class model_methods_creditcard
 {
+    const CHECKOUT_NON_PCI_JS_URL_LIVE          = 'https://cdn3.checkout.com/js/checkout.js';
+    const CHECKOUT_NON_PCI_JS_URL_SANDBOX       = 'https://cdn3.checkout.com/sandbox/js/checkout.js';
+    const CHECKOUT_NON_PCI_CHARGE_MODE_NON_3D   = 1;
+    const PAYMENT_CODE                          = 'checkoutjs';
 
-    public function before_process()
-    {
+    const CHECKOUT_API_RESPONSE_CODE_APPROVED       = 10000;
+    const CHECKOUT_API_RESPONSE_CODE_APPROVED_RISK  = 10100;
 
-    }
+    /**
+     * Decorate post data for Checkout API
+     *
+     * @param $params
+     * @return array
+     */
+    public function createChargeConfig($params) {
+        $Api = CheckoutApi_Api::getApi(array('mode'=>$params['modetype']));
 
-    public function  before_capture($params)
-    {
-
-        global  $HTTP_POST_VARS,$order;
-
-        $config = parent::before_capture($params);
-
-
-        $config['postedParam']['cardToken'] = $_POST['cko-cc-token'];
-        return $this->_placeorder($config);
-
-    }
-
-    public function getFooterHtml($param)
-    {
-        $GATEWAY = getGatewayVariables('checkoutapipayment');
-        $configParam = array_merge_recursive($GATEWAY,$param);
-     //  $paymentToken = $this->getPaymentToken($configParam);
-        $config['debug'] = 'false';
-        $config['publicKey']  = $GATEWAY['publickey'] ;
-        $config['email'] =   $param['clientsdetails']['email'];
-        $config['name'] = $param['clientsdetails']['firstname'].' '. $param['clientsdetails']['lastname'];
-        $config['amount'] =   $param['rawtotal']*100;
-        $config['currency'] =   $param['currency']['code'];
-        $config['widgetSelector'] =  '.widget-container';
-        $config['cardTokenReceivedEvent'] = "
-                        document.getElementById('cko-cc-paymentToken').value = event.data.paymentToken;
-
-                        ";
-        $config['widgetRenderedEvent'] ="";
-        $config['readyEvent'] = '';
-        $html = "  <script type='text/javascript' >
-            window.CKOConfig = {
-                publicKey: '".$GATEWAY['publickey']."',
-                debugMode: true,
-                paymentToken: '".$paymentToken ."',
-                ready: function() {
-                    console.log(document.getElementById('pgbtncheckoutapipayment').checked);
-                    CheckoutKit.monitorForm('#mainfrm', CheckoutKit.CardFormModes.CARD_TOKENISATION);
-                    $('[name=ccnumber]').attr('data-checkout','email-address');
-                    $('#expiry-month').val($('#ccexpirymonth').val());
-
-                    $('#ccexpirymonth').change(function(){
-                        $('#expiry-month').val($(this).val());
-                    });
-
-                    $('#expiry-year').val( $('[name=ccexpiryyear]').val());
-
-                    $('[name=ccexpiryyear]').change(function(){
-                        $('#expiry-year').val($(this).val());
-                    });
-
-                    $('[name=cccvv]').attr('data-checkout','cvv');
-                    $('[name=ccnumber]').attr('data-checkout','card-number');
-                    $('[name^=submit]').remove();
-                    $('#mainfrm').attr('action','/cart.php?a=checkout&submit=true');
-
-                },
-                formMonitored: function(event) {
-
-                },
-                formSubmitted: function(event) {
-
-
-                }
-            };
-        </script>
-        <script  src='https://www.checkout.com/cdn/js/checkoutkit.js' async ></script>";
-        $html.='<div style="display:block" class="widget-container"><input data-checkout="email-address" type="hidden" placeholder="Enter your e-mail address" class="input-control" value="'. $config['email'] .'"/>
-                <input data-checkout="card-name" type="hidden" placeholder="Enter the name on your card" autocomplete="off" class="input-control" value="'. $config['name'].'" />
-                <input data-checkout="expiry-month" id="expiry-month" type="hidden" placeholder="MM" autocomplete="off" class="input-control center-align" maxlength="2" value=""/>
-                <input data-checkout="expiry-year" id="expiry-year" type="hidden" placeholder="YY" autocomplete="off" class="input-control center-align" maxlength="2" value=""/>
-
-</div><script>   $(".widget-container").insertBefore($("#ccinputform"));</script>';
-        return $html;
-    }
-
-    public function getHeadHtml($param)
-    {
-        return '';
-    }
-
-
-    public function getPaymentToken($params)
-    {
-//        getPaymentToken
-//
-        $Api = CheckoutApi_Api::getApi(array('mode'=> $params['modetype']));
-        $config = array();
-        $amountCents = (int)$params['rawtotal']*100 ;
-        $config['authorization'] = $params['secretkey'];
+        $secretKey      = $params['secretkey'];
+        $amount         = $params['amount'];
+        $currencyDesc   = $params['currency'];
+        $amountCents    = $Api->valueToDecimal($amount,$currencyDesc);
+        $config         = array();
         $config['mode'] = $params['modetype'];
 
-        $config['postedParam'] = array (
-            'email'     => $params['clientsdetails']['email'] ,
-            'value'     =>$amountCents,
-            'currency'  => $params['currency']['code'],
+        $transactionMode    = $params['transmethod'];
+        $autoCapTime        = $params['autoCaptime'];
+        $customerName       = $params['clientdetails']['firstname'] . " " . $params['clientdetails']['lastname'];
+        $email              = $params['clientdetails']['email'];
+        $autoCapture        = $transactionMode == 'Authorize' ? CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH : CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE;
 
-            'card'      => array(
-                'billingDetails' => array (
-                    'addressLine1' => $params['clientsdetails']['address1'],
-                    'addressLine2' => $params['clientsdetails']['address2'],
-                    'postcode'     => $params['clientsdetails']['postcode'],
-                    'country'      => $params['clientsdetails']['country'],
-                    'city'         => $params['clientsdetails']['city'],
-                    'state'        => $params['clientsdetails']['state'],
-                    'phone'        => array('number' => $params['clientsdetails']['phonenumber'])
-                )
+        $config['postedParam'] = array (
+            'trackId'           => $params['invoiceid'],
+            'value'             => $amountCents,
+            "chargeMode"        => self::CHECKOUT_NON_PCI_CHARGE_MODE_NON_3D,
+            'currency'          => $currencyDesc,
+            'autoCapture'       => $autoCapture,
+            'autoCapTime'       => $autoCapTime,
+            'email'             => $email,
+            'custName'          => $customerName,
+            'email'             => $email,
+            'metadata'          => array(
+                'server'            => $_SERVER['HTTP_USER_AGENT'],
+                'whmcs_version'     => $params['whmcsVersion'],
+                'plugin_version'    => '2.0.0',
+                'lib_version'       => CheckoutApi_Client_Constant::LIB_VERSION,
+                'integration_type'  => 'JS',
+                'time'              => date('Y-m-d H:i:s')
             )
         );
 
-        if ($params['transmethod']== 'Capture') {
-            $config = array_merge_recursive( $this->_captureConfig($params),$config);
-        } else {
-            $config = array_merge_recursive( $this->_authorizeConfig($params),$config);
-        }
+        $config['authorization']    = $secretKey;
+        $_SESSION["favcolor"]       = $config;
 
+        return $config;
+    }
 
+    /**
+     * Get Payment Token from
+     *
+     * @param $params
+     * @return mixed
+     */
+    public function getPaymentToken($params) {
+        $Api    = CheckoutApi_Api::getApi(array('mode'=>$params['modetype']));
+        $config = $this->createChargeConfig($params);
+
+        /* Get payment Token */
         $paymentTokenCharge = $Api->getPaymentToken($config);
+        $paymentTokenReturn = array(
+            'success'   => false,
+            'token'     => '',
+            'message'   => ''
+        );
 
-        $paymentToken    =   '';
+        if ($Api->getExceptionState()->hasError()) {
+            logTransaction('checkoutjs', $Api->getExceptionState()->getErrorMessage(), "Unsuccessful");
+        }
 
         if($paymentTokenCharge->isValid()){
-            $paymentToken = $paymentTokenCharge->getId();
+            $paymentToken                   = $paymentTokenCharge->getId();
+            $paymentTokenReturn['token']    = $paymentToken ;
+            $paymentTokenReturn['success']  = true;
         }
 
-        if(!$paymentToken) {
-           throw new Exception($paymentTokenCharge->getExceptionState()->getErrorMessage().
-                ' ( '.$paymentTokenCharge->getEventId().')'
-            );
+        return $paymentTokenReturn['token'];
+    }
+
+    /**
+     * Validate Response Object by Response Code
+     *
+     * @param $response
+     * @return bool
+     */
+    public static function responseValidation($response) {
+        $responseCode = (int)$response->getResponseCode();
+
+        if ($responseCode !== self::CHECKOUT_API_RESPONSE_CODE_APPROVED && $responseCode !== self::CHECKOUT_API_RESPONSE_CODE_APPROVED_RISK) {
+            return false;
         }
 
-        return $paymentToken;
-
+        return true;
     }
 }
