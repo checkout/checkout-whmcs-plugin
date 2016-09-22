@@ -44,6 +44,7 @@ class model_methods_creditcard
             'metadata'          => array(
                 'server'            => $_SERVER['HTTP_USER_AGENT'],
                 'whmcs_version'     => $params['whmcsVersion'],
+                'plugin_version'    => '2.0.0',
                 'lib_version'       => CheckoutApi_Client_Constant::LIB_VERSION,
                 'integration_type'  => 'JS',
                 'time'              => date('Y-m-d H:i:s')
