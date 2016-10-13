@@ -1,13 +1,14 @@
 <?php
 class model_methods_creditcard
 {
-    const CHECKOUT_NON_PCI_JS_URL_LIVE          = 'https://cdn3.checkout.com/js/checkout.js';
-    const CHECKOUT_NON_PCI_JS_URL_SANDBOX       = 'https://cdn3.checkout.com/sandbox/js/checkout.js';
+    const CHECKOUT_NON_PCI_JS_URL_LIVE          = 'https://cdn.checkout.com/js/checkout.js';
+    const CHECKOUT_NON_PCI_JS_URL_SANDBOX       = 'https://cdn.checkout.com/sandbox/js/checkout.js';
     const CHECKOUT_NON_PCI_CHARGE_MODE_NON_3D   = 1;
     const PAYMENT_CODE                          = 'checkoutjs';
 
     const CHECKOUT_API_RESPONSE_CODE_APPROVED       = 10000;
     const CHECKOUT_API_RESPONSE_CODE_APPROVED_RISK  = 10100;
+    const PLUGIN_VERSION = '2.0.1';
 
     /**
      * Decorate post data for Checkout API
@@ -44,7 +45,7 @@ class model_methods_creditcard
             'metadata'          => array(
                 'server'            => $_SERVER['HTTP_USER_AGENT'],
                 'whmcs_version'     => $params['whmcsVersion'],
-                'plugin_version'    => '2.0.0',
+                'plugin_version'    => self::PLUGIN_VERSION,
                 'lib_version'       => CheckoutApi_Client_Constant::LIB_VERSION,
                 'integration_type'  => 'JS',
                 'time'              => date('Y-m-d H:i:s')
